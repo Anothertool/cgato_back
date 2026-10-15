@@ -16,9 +16,12 @@ class SurgeryLensCheckInline(admin.TabularInline):
 
 @admin.register(Surgery)
 class SurgeryAdmin(admin.ModelAdmin):
-    list_display = ['id', 'patient', 'hospital', 'surgery_type', 'scheduled_at', 'status', 'deleted_at']
-    list_filter = ['status', 'eye', 'hospital']
-    readonly_fields = ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by']
+    list_display = ['id', 'patient', 'surgery_type', 'scheduled_at', 'budget_status', 'display_status', 'deleted_at']
+    list_filter = ['budget_status', 'eye', 'surgery_type', 'insurer']
+    readonly_fields = [
+        'id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'display_status',
+        'quoted_at', 'accepted_at', 'lost_at', 'completed_at', 'cancelled_at',
+    ]
     autocomplete_fields = ['patient']
     inlines = [SurgeryLensCheckInline]
 
@@ -26,7 +29,9 @@ class SurgeryAdmin(admin.ModelAdmin):
         previous = {}
         if change:
             current = Surgery.objects.select_for_update().get(pk=obj.pk)
-            previous = {field: getattr(current, field) for field in ('lens_ordered', 'lens_received', 'lens_verified')}
+            previous = {field: getattr(current, field) for field in ('lens_ordered', 'lens_verified')}
+            for field in ('quoted_at', 'accepted_at', 'lost_at', 'completed_at', 'cancelled_at'):
+                setattr(obj, field, getattr(current, field))
         super().save_model(request, obj, form, change)
         obj.record_lens_changes(previous, request.user)
 

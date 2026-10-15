@@ -9,9 +9,9 @@ class SurgeryFilter(filters.FilterSet):
     class Meta:
         model = Surgery
         fields = {
-            'status': ['exact'],
-            'hospital': ['exact'],
+            'budget_status': ['exact'],
+            'surgery_type': ['exact'],
             'eye': ['exact'],
             'insurer': ['exact'],
-            'scheduled_at': ['gte', 'lte'],
+            'scheduled_at': ['gte', 'lte', 'lt'],
         }

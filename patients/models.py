@@ -2,6 +2,8 @@ import uuid
 
 from django.db import models
 
+from .choices import PatientSourceChoices
+
 
 class Patient(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -9,6 +11,7 @@ class Patient(models.Model):
     last_name = models.CharField(max_length=150, blank=True)
     phone = models.CharField(max_length=50, blank=True)
     clinical_reference = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    patient_source = models.CharField(max_length=20, choices=PatientSourceChoices.choices, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
