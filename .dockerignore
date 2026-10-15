@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+!.env.example
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+db.sqlite3
+media
+staticfiles
+ngrok.exe
+railway.exe
+.vscode
+.idea
+**/*.log
+.pytest_cache

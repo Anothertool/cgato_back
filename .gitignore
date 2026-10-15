@@ -1,1 +1,17 @@
 venv/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+db.sqlite3
+media/
+staticfiles/
+.idea/
+.vscode/*
+!.vscode/tasks.json
+railway.exe
+ngrok.exe
+*.log
+.pytest_cache/
