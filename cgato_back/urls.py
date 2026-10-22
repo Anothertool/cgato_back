@@ -18,12 +18,15 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from cash.views import CashEntryViewSet, CashSummaryViewSet
 from patients.views import PatientViewSet
 from surgeries.views import SurgeryViewSet
 
 router = DefaultRouter()
 router.register('patients', PatientViewSet, basename='patient')
 router.register('surgeries', SurgeryViewSet, basename='surgery')
+router.register('cash/entries', CashEntryViewSet, basename='cash-entry')
+router.register('cash/summary', CashSummaryViewSet, basename='cash-summary')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

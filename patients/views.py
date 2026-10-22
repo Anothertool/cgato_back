@@ -20,4 +20,4 @@ class PatientViewSet(viewsets.ModelViewSet):
         try:
             instance.delete()
         except ProtectedError:
-            raise serializers.ValidationError('Patients with associated surgeries cannot be deleted.') from None
+            raise serializers.ValidationError('Patients with associated surgeries or cash entries cannot be deleted.') from None
