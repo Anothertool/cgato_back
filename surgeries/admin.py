@@ -21,6 +21,7 @@ class SurgeryAdmin(admin.ModelAdmin):
     readonly_fields = [
         'id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'display_status',
         'quoted_at', 'accepted_at', 'lost_at', 'completed_at', 'cancelled_at',
+        'amount_paid',
     ]
     autocomplete_fields = ['patient']
     inlines = [SurgeryLensCheckInline]

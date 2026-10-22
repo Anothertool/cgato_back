@@ -34,10 +34,6 @@ class Surgery(models.Model):
         max_digits=12, decimal_places=2, blank=True, null=True,
         validators=[MinValueValidator(Decimal('0.00'))],
     )
-    amount_paid = models.DecimalField(
-        max_digits=12, decimal_places=2, blank=True, null=True,
-        validators=[MinValueValidator(Decimal('0.00'))],
-    )
     
     #Sales Process
     first_consultation_at = models.DateField(blank=True, null=True)
@@ -68,16 +64,20 @@ class Surgery(models.Model):
     class Meta:
         ordering = ['scheduled_at', 'id']
         constraints = [
-            models.CheckConstraint(condition=models.Q(amount_paid__gte=0) | models.Q(amount_paid__isnull=True), name='surgery_amount_paid_nonnegative'),
-            models.CheckConstraint(condition=models.Q(amount_paid__lte=models.F('amount')) | models.Q(amount__isnull=True) | models.Q(amount_paid__isnull=True), name='surgery_amount_paid_lte_amount'),
             models.CheckConstraint(condition=models.Q(amount__gte=0) | models.Q(amount__isnull=True), name='surgery_amount_nonnegative'),
             models.CheckConstraint(condition=models.Q(operating_room_cost__gte=0) | models.Q(operating_room_cost__isnull=True), name='surgery_operating_room_cost_nonnegative'),
             models.CheckConstraint(condition=models.Q(completed_at__isnull=True) | models.Q(cancelled_at__isnull=True), name='surgery_execution_dates_exclusive'),
         ]
 
     @property
+    def amount_paid(self):
+        if hasattr(self, '_amount_paid'):
+            return self._amount_paid
+        return self.cash_entries.aggregate(total=models.Sum('amount', default=Decimal('0.00')))['total']
+
+    @property
     def payment_status(self):
-        if self.amount is None or self.amount_paid is None:
+        if self.amount is None:
             return 'UNKNOWN'
         if self.amount_paid == self.amount:
             return 'PAID'
@@ -87,13 +87,13 @@ class Surgery(models.Model):
 
     @property
     def amount_due(self):
-        if self.amount is None or self.amount_paid is None:
+        if self.amount is None:
             return None
         return self.amount - self.amount_paid
 
     @property
     def payment_percentage(self):
-        if self.amount is None or self.amount_paid is None:
+        if self.amount is None:
             return None
         if self.amount == 0:
             return Decimal('100.00')
@@ -135,8 +135,8 @@ class Surgery(models.Model):
 
     def clean(self):
         super().clean()
-        if self.amount is not None and self.amount_paid is not None and self.amount_paid > self.amount:
-            raise ValidationError({'amount_paid': 'Amount paid cannot exceed the surgery amount.'})
+        if self.amount is not None and self.amount_paid > self.amount:
+            raise ValidationError({'amount': 'Amount cannot be less than the total payments.'})
         if self.completed_at is not None:
             if self.cancelled_at is not None:
                 raise ValidationError({'completed_at': 'A completed surgery cannot be cancelled.'})

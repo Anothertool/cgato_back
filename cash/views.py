@@ -1,7 +1,8 @@
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Value
+from django.db.models.functions import Concat
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -15,7 +16,27 @@ from .serializers import (
 
 
 def filter_entries(queryset, params, include_dates=True):
-    for field in ('payment_method', 'invoice_status', 'patient_id'):
+    search = params.get('search')
+    if search:
+        match = (
+            Q(patient_name__icontains=search)
+            | Q(surgery_patient_name__icontains=search)
+            | Q(amount__icontains=search.replace(',', '.'))
+        )
+        try:
+            amount = Decimal(search.replace(',', '.'))
+        except InvalidOperation:
+            pass
+        else:
+            if amount.is_finite() and Decimal('0.01') <= amount <= Decimal('9999999999.99'):
+                match |= Q(amount=amount)
+        queryset = queryset.alias(
+            patient_name=Concat('patient__first_name', Value(' '), 'patient__last_name'),
+            surgery_patient_name=Concat(
+                'surgery__patient__first_name', Value(' '), 'surgery__patient__last_name',
+            ),
+        ).filter(match)
+    for field in ('payment_method', 'invoice_status', 'patient_id', 'surgery_id'):
         if field in params:
             queryset = queryset.filter(**{field: params[field]})
     if include_dates:
@@ -32,7 +53,7 @@ def query_params(request):
 
 
 class CashEntryViewSet(viewsets.ModelViewSet):
-    queryset = CashEntry.objects.select_related('patient')
+    queryset = CashEntry.objects.select_related('patient', 'surgery__patient').order_by('-date', '-created_at', 'id')
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_serializer_class(self):

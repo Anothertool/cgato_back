@@ -1,5 +1,7 @@
+from decimal import Decimal
+
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -10,11 +12,15 @@ from rest_framework.response import Response
 from .filters import SurgeryFilter
 from .choices import BudgetStatusChoices
 from .models import Surgery
-from .serializers import SurgeryInputSerializer, SurgeryOutputSerializer
+from .serializers import (
+    SurgeryDetailSerializer, SurgeryInputSerializer, SurgeryOptionSerializer, SurgeryOutputSerializer,
+)
 
 
 class SurgeryViewSet(viewsets.ModelViewSet):
-    queryset = Surgery.objects.filter(deleted_at__isnull=True).select_related('patient').prefetch_related('lens_checks').order_by(
+    queryset = Surgery.objects.filter(deleted_at__isnull=True).select_related('patient').annotate(
+        _amount_paid=Sum('cash_entries__amount', default=Decimal('0.00')),
+    ).prefetch_related('lens_checks').order_by(
         F('scheduled_at').desc(nulls_last=True), '-created_at', 'id',
     )
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -23,10 +29,28 @@ class SurgeryViewSet(viewsets.ModelViewSet):
     ordering_fields = ['scheduled_at', 'created_at', 'updated_at', 'id']
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action == 'retrieve':
+            return queryset.prefetch_related('cash_entries')
+        return queryset
+
     def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return SurgeryDetailSerializer
+        if self.action == 'cash_options':
+            return SurgeryOptionSerializer
         if self.action in ('create', 'update', 'partial_update'):
             return SurgeryInputSerializer
         return SurgeryOutputSerializer
+
+    @action(detail=False, methods=['get'], url_path='options')
+    def cash_options(self, request):
+        queryset = self.filter_queryset(self.get_queryset()).prefetch_related(None)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(queryset, many=True).data)
 
     def get_locked_surgery(self):
         surgery = get_object_or_404(

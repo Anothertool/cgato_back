@@ -2,6 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 
+from cash.models import CashEntry
 from patients.models import Patient
 from patients.serializers import PatientInputSerializer, PatientOutputSerializer
 from .choices import BudgetStatusChoices
@@ -15,6 +16,18 @@ class SurgeryLensCheckSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class SurgeryOptionSerializer(serializers.ModelSerializer):
+    patient_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Surgery
+        fields = ['id', 'patient_name', 'scheduled_at']
+        read_only_fields = fields
+
+    def get_patient_name(self, instance):
+        return f'{instance.patient.first_name} {instance.patient.last_name}'.strip()
+
+
 class SurgeryOutputSerializer(serializers.ModelSerializer):
     patient = PatientOutputSerializer(read_only=True)
     lens_checks = SurgeryLensCheckSerializer(many=True, read_only=True)
@@ -25,6 +38,7 @@ class SurgeryOutputSerializer(serializers.ModelSerializer):
     budget_status_label = serializers.CharField(source='get_budget_status_display', read_only=True)
     display_status = serializers.CharField(read_only=True)
     payment_status = serializers.CharField(read_only=True)
+    amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     amount_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True, allow_null=True)
     payment_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True, allow_null=True)
 
@@ -46,6 +60,27 @@ class SurgeryOutputSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class SurgeryPaymentSerializer(serializers.ModelSerializer):
+    payment_method_label = serializers.CharField(source='get_payment_method_display', read_only=True)
+    invoice_status_label = serializers.CharField(source='get_invoice_status_display', read_only=True)
+
+    class Meta:
+        model = CashEntry
+        fields = [
+            'id', 'date', 'amount', 'payment_method', 'payment_method_label',
+            'invoice_number', 'invoice_status', 'invoice_status_label', 'notes', 'created_at',
+        ]
+        read_only_fields = fields
+
+
+class SurgeryDetailSerializer(SurgeryOutputSerializer):
+    payments = SurgeryPaymentSerializer(source='cash_entries', many=True, read_only=True)
+
+    class Meta(SurgeryOutputSerializer.Meta):
+        fields = SurgeryOutputSerializer.Meta.fields + ['payments']
+        read_only_fields = fields
+
+
 class SurgeryInputSerializer(serializers.ModelSerializer):
     patient_id = serializers.PrimaryKeyRelatedField(
         queryset=Patient.objects.all(), required=False, write_only=True,
@@ -62,7 +97,7 @@ class SurgeryInputSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'lens_checks',
             'quoted_at', 'accepted_at', 'lost_at', 'completed_at', 'cancelled_at',
-            'payment_status', 'amount_due', 'payment_percentage',
+            'amount_paid', 'payment_status', 'amount_due', 'payment_percentage',
         ]
         extra_kwargs = {
             'budget_status': {'allow_blank': False},
@@ -85,9 +120,9 @@ class SurgeryInputSerializer(serializers.ModelSerializer):
     @staticmethod
     def validate_payment(attrs, instance):
         amount = attrs.get('amount', getattr(instance, 'amount', None))
-        amount_paid = attrs.get('amount_paid', getattr(instance, 'amount_paid', None))
+        amount_paid = getattr(instance, 'amount_paid', None)
         if amount is not None and amount_paid is not None and amount_paid > amount:
-            raise serializers.ValidationError({'amount_paid': 'Amount paid cannot exceed the surgery amount.'})
+            raise serializers.ValidationError({'amount': 'Amount cannot be less than the total payments.'})
 
     @staticmethod
     def validate_execution_state(attrs, instance):
