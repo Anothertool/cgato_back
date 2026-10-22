@@ -26,7 +26,7 @@ class SurgeryViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = SurgeryFilter
     search_fields = ['patient__first_name', 'patient__last_name', 'patient__clinical_reference', 'notes']
-    ordering_fields = ['scheduled_at', 'created_at', 'updated_at', 'id']
+    ordering_fields = ['created_at','scheduled_at','updated_at', 'id']
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
