@@ -56,14 +56,14 @@ class CashEntryInputSerializer(serializers.ModelSerializer):
             return
         surgery = Surgery.objects.select_for_update().get(pk=surgery.pk)
         if surgery.deleted_at is not None:
-            raise serializers.ValidationError({'surgery_id': 'Surgery not found.'})
+            raise serializers.ValidationError({'surgery_id': 'Cirugía no encontrada.'})
         entries = surgery.cash_entries.all()
         if instance is not None:
             entries = entries.exclude(pk=instance.pk)
         total = entries.aggregate(total=Sum('amount', default=Decimal('0.00')))['total']
         amount = validated_data.get('amount', getattr(instance, 'amount', Decimal('0.00')))
         if surgery.amount is not None and total + amount > surgery.amount:
-            raise serializers.ValidationError({'amount': 'Total payments cannot exceed the surgery amount.'})
+            raise serializers.ValidationError({'amount': 'El importe total de los pagos no puede superar el importe de la cirugía.'})
 
     @transaction.atomic
     def create(self, validated_data):
@@ -104,6 +104,8 @@ class CashSummarySerializer(serializers.Serializer):
     date = serializers.DateField()
     week_start = serializers.DateField()
     week_end = serializers.DateField()
+    month_start = serializers.DateField()
+    month_end = serializers.DateField()
     date_from = serializers.DateField(allow_null=True)
     date_to = serializers.DateField(allow_null=True)
     total = serializers.DecimalField(max_digits=24, decimal_places=2)
@@ -113,4 +115,5 @@ class CashSummarySerializer(serializers.Serializer):
     )
     total_today = serializers.DecimalField(max_digits=24, decimal_places=2)
     total_week = serializers.DecimalField(max_digits=24, decimal_places=2)
+    total_month = serializers.DecimalField(max_digits=24, decimal_places=2)
     cash_today = serializers.DecimalField(max_digits=24, decimal_places=2)

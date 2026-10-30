@@ -54,7 +54,7 @@ class CashEntry(models.Model):
                 total=models.Sum('amount', default=Decimal('0.00')),
             )['total']
             if self.surgery.amount is not None and total + self.amount > self.surgery.amount:
-                raise ValidationError({'amount': 'Total payments cannot exceed the surgery amount.'})
+                raise ValidationError({'amount': 'El importe total de los pagos no puede superar el importe de la cirugía.'})
 
     def __str__(self):
         return str(self.pk)

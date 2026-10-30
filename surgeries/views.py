@@ -1,7 +1,9 @@
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import F, Sum
+from django.db.models import Count, Exists, F, OuterRef, Sum
+from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -9,10 +11,12 @@ from rest_framework import filters, serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from cash.models import CashEntry
 from .filters import SurgeryFilter
 from .choices import BudgetStatusChoices
 from .models import Surgery
 from .serializers import (
+    SurgeryAvailabilityQuerySerializer, SurgeryCalendarSerializer,
     SurgeryDetailSerializer, SurgeryInputSerializer, SurgeryOptionSerializer, SurgeryOutputSerializer,
 )
 
@@ -29,13 +33,26 @@ class SurgeryViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at','scheduled_at','updated_at', 'id']
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
+    def paginate_queryset(self, queryset):
+        if self.action == 'list' and self.request.query_params.get('view') == 'calendar':
+            return None
+        return super().paginate_queryset(queryset)
+
     def get_queryset(self):
+        if self.action == 'list' and self.request.query_params.get('view') == 'calendar':
+            return Surgery.objects.filter(deleted_at__isnull=True).select_related('patient').only(
+                'id', 'patient_id', 'patient__first_name', 'patient__last_name', 'scheduled_at',
+            ).annotate(
+                has_payment=Exists(CashEntry.objects.filter(surgery_id=OuterRef('pk'))),
+            ).order_by(F('scheduled_at').desc(nulls_last=True), '-created_at', 'id')
         queryset = super().get_queryset()
         if self.action == 'retrieve':
             return queryset.prefetch_related('cash_entries')
         return queryset
 
     def get_serializer_class(self):
+        if self.action == 'list' and self.request.query_params.get('view') == 'calendar':
+            return SurgeryCalendarSerializer
         if self.action == 'retrieve':
             return SurgeryDetailSerializer
         if self.action == 'cash_options':
@@ -43,6 +60,44 @@ class SurgeryViewSet(viewsets.ModelViewSet):
         if self.action in ('create', 'update', 'partial_update'):
             return SurgeryInputSerializer
         return SurgeryOutputSerializer
+
+    @action(detail=False, methods=['get'])
+    def availability(self, request):
+        query = SurgeryAvailabilityQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        start = query.validated_data['start']
+        end = query.validated_data['end']
+        tz = timezone.get_current_timezone()
+        occupied_by_date = dict(
+            Surgery.objects.filter(
+                deleted_at__isnull=True,
+                cancelled_at__isnull=True,
+                scheduled_at__gte=timezone.make_aware(datetime.combine(start, time.min), tz),
+                scheduled_at__lt=timezone.make_aware(datetime.combine(end, time.min), tz),
+            ).exclude(budget_status=BudgetStatusChoices.LOST).order_by().annotate(
+                date=TruncDate('scheduled_at', tzinfo=tz),
+            ).values('date').annotate(
+                occupied=Count('id'),
+            ).values_list('date', 'occupied')
+        )
+        days = []
+        date = start
+        capacities = {0: 7, 3: 7}
+        while date < end:
+            capacity = capacities.get(date.weekday())
+            if capacity is not None:
+                occupied = occupied_by_date.get(date, 0)
+                available = max(capacity - occupied, 0)
+                status = 'FULL' if available == 0 else 'LIMITED' if available <= 2 else 'AVAILABLE'
+                days.append({
+                    'date': date.isoformat(),
+                    'capacity': capacity,
+                    'occupied': occupied,
+                    'available': available,
+                    'status': status,
+                })
+            date += timedelta(days=1)
+        return Response({'days': days})
 
     @action(detail=False, methods=['get'], url_path='options')
     def cash_options(self, request):

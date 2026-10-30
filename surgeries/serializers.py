@@ -28,6 +28,24 @@ class SurgeryOptionSerializer(serializers.ModelSerializer):
         return f'{instance.patient.first_name} {instance.patient.last_name}'.strip()
 
 
+class SurgeryCalendarSerializer(SurgeryOptionSerializer):
+    has_payment = serializers.BooleanField(read_only=True)
+
+    class Meta(SurgeryOptionSerializer.Meta):
+        fields = SurgeryOptionSerializer.Meta.fields + ['has_payment']
+        read_only_fields = fields
+
+
+class SurgeryAvailabilityQuerySerializer(serializers.Serializer):
+    start = serializers.DateField()
+    end = serializers.DateField()
+
+    def validate(self, attrs):
+        if attrs['end'] <= attrs['start']:
+            raise serializers.ValidationError({'end': 'Must be later than start.'})
+        return attrs
+
+
 class SurgeryOutputSerializer(serializers.ModelSerializer):
     patient = PatientOutputSerializer(read_only=True)
     lens_checks = SurgeryLensCheckSerializer(many=True, read_only=True)
@@ -41,6 +59,10 @@ class SurgeryOutputSerializer(serializers.ModelSerializer):
     amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     amount_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True, allow_null=True)
     payment_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True, allow_null=True)
+    has_payment = serializers.SerializerMethodField()
+
+    def get_has_payment(self, instance):
+        return instance.amount_paid > 0
 
     class Meta:
         model = Surgery
@@ -54,7 +76,7 @@ class SurgeryOutputSerializer(serializers.ModelSerializer):
             'insurer_label', 'iol_model_label', 'budget_status_label',
             'lens_ordered', 'lens_verified', 'eyes_verified',
             'informed_consent_signed', 'blood_test_done', 'anesthetist_appointment',
-            'created_at', 'updated_at', 'deleted_at',
+            'created_at', 'updated_at', 'deleted_at', 'has_payment',
             'deleted_by', 'lens_checks',
         ]
         read_only_fields = fields
@@ -93,7 +115,7 @@ class SurgeryInputSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Surgery
-        fields = [field for field in SurgeryOutputSerializer.Meta.fields if not field.endswith('_label') and field != 'display_status'] + ['patient_id']
+        fields = [field for field in SurgeryOutputSerializer.Meta.fields if not field.endswith('_label') and field not in ('display_status', 'has_payment')] + ['patient_id']
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'lens_checks',
             'quoted_at', 'accepted_at', 'lost_at', 'completed_at', 'cancelled_at',

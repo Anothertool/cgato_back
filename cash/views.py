@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -77,6 +78,8 @@ class CashSummaryViewSet(viewsets.ViewSet):
         anchor = params.get('date', timezone.localdate())
         week_start = anchor - timedelta(days=anchor.weekday())
         week_end = week_start + timedelta(days=min(6, (date.max - week_start).days))
+        month_start = anchor.replace(day=1)
+        month_end = anchor.replace(day=monthrange(anchor.year, anchor.month)[1])
         base = filter_entries(CashEntry.objects.all(), params, include_dates=False)
         period_params = params.copy()
         if not any(field in params for field in ('date', 'date_from', 'date_to')):
@@ -88,10 +91,12 @@ class CashSummaryViewSet(viewsets.ViewSet):
         cards = base.aggregate(
             total_today=Sum('amount', filter=Q(date=anchor), default=Decimal('0.00')),
             total_week=Sum('amount', filter=Q(date__range=(week_start, week_end)), default=Decimal('0.00')),
+            total_month=Sum('amount', filter=Q(date__range=(month_start, month_end)), default=Decimal('0.00')),
             cash_today=Sum('amount', filter=Q(date=anchor, payment_method=PaymentMethodChoices.CASH), default=Decimal('0.00')),
         )
         summary = {
             'date': anchor, 'week_start': week_start, 'week_end': week_end,
+            'month_start': month_start, 'month_end': month_end,
             'date_from': period_params.get('date', params.get('date_from')),
             'date_to': period_params.get('date', params.get('date_to')),
             'total': sum(amounts.values(), Decimal('0.00')),
