@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'patients',
     'surgeries',
     'cash',
+    'orders',
 ]
 
 MIDDLEWARE = [

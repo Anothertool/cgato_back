@@ -18,6 +18,10 @@ class CashEntry(models.Model):
         'surgeries.Surgery', on_delete=models.PROTECT, null=True, blank=True,
         related_name='cash_entries',
     )
+    lens_order = models.ForeignKey(
+        'orders.LensOrder', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='cash_entries',
+    )
     date = models.DateField(db_index=True)
     amount = models.DecimalField(
         max_digits=12, decimal_places=2,
@@ -42,6 +46,11 @@ class CashEntry(models.Model):
                 condition=models.Q(patient__isnull=True) | models.Q(surgery__isnull=True),
                 name='cash_entry_patient_or_surgery',
             ),
+            models.CheckConstraint(
+                condition=models.Q(lens_order__isnull=True)
+                | models.Q(patient__isnull=True, surgery__isnull=True),
+                name='cash_entry_lens_order_exclusive',
+            ),
             models.CheckConstraint(condition=models.Q(amount__gte=Decimal('0.01')), name='cash_entry_amount_positive'),
         ]
 
@@ -49,6 +58,8 @@ class CashEntry(models.Model):
         super().clean()
         if self.patient_id is not None and self.surgery_id is not None:
             raise ValidationError('Provide either a patient or a surgery, not both.')
+        if self.lens_order_id is not None and (self.patient_id is not None or self.surgery_id is not None):
+            raise ValidationError('A lens order payment cannot also link directly to a patient or surgery.')
         if self.surgery_id is not None and self.amount is not None:
             total = self.surgery.cash_entries.exclude(pk=self.pk).aggregate(
                 total=models.Sum('amount', default=Decimal('0.00')),

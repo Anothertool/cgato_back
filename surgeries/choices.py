@@ -38,6 +38,9 @@ class IOLModelChoices(models.TextChoices):
     MULTI_DRN00V = 'MULTI_DRN00V', 'MULTI DRN00V'
     MULTI_TORICA_DRT = 'MULTI_TORICA_DRT', 'MULTI + TORICA DRT'
     HOYA_XY1 = 'HOYA_XY1', 'HOYA XY1'
+    EYEHANCE_TORICA = 'EYEHANCE_TORICA', 'Eyhance tórica J&J'
+    EDOF_BVI_SERENITY = 'EDOF_BVI_SERENITY', 'EDOF BVI Serenity'
+    EDOF_TORICA = 'EDOF_TORICA', 'EDOF tórica'
     OTHER = 'OTHER', 'Otros'
 
 

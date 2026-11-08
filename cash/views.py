@@ -37,7 +37,7 @@ def filter_entries(queryset, params, include_dates=True):
                 'surgery__patient__first_name', Value(' '), 'surgery__patient__last_name',
             ),
         ).filter(match)
-    for field in ('payment_method', 'invoice_status', 'patient_id', 'surgery_id'):
+    for field in ('payment_method', 'invoice_status', 'patient_id', 'surgery_id', 'lens_order_id'):
         if field in params:
             queryset = queryset.filter(**{field: params[field]})
     if include_dates:

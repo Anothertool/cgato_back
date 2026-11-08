@@ -4,6 +4,7 @@ from django.db import transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
+from orders.models import LensOrder
 from patients.models import Patient
 from patients.serializers import PatientOutputSerializer
 from surgeries.models import Surgery
@@ -15,6 +16,7 @@ from .models import CashEntry
 class CashEntryOutputSerializer(serializers.ModelSerializer):
     patient = PatientOutputSerializer(read_only=True)
     surgery = SurgeryOptionSerializer(read_only=True)
+    lens_order_id = serializers.UUIDField(read_only=True)
     surgery_id = serializers.PrimaryKeyRelatedField(
         source='surgery', read_only=True, pk_field=serializers.UUIDField(),
     )
@@ -22,13 +24,17 @@ class CashEntryOutputSerializer(serializers.ModelSerializer):
     class Meta:
         model = CashEntry
         fields = [
-            'id', 'patient', 'surgery_id', 'surgery', 'date', 'amount', 'payment_method',
+            'id', 'patient', 'surgery_id', 'surgery', 'lens_order_id', 'date', 'amount', 'payment_method',
             'invoice_number', 'invoice_status', 'notes', 'created_at',
         ]
         read_only_fields = fields
 
 
 class CashEntryInputSerializer(serializers.ModelSerializer):
+    lens_order_id = serializers.PrimaryKeyRelatedField(
+        source='lens_order', queryset=LensOrder.objects.filter(deleted_at__isnull=True),
+        required=False, allow_null=True, write_only=True,
+    )
     surgery_id = serializers.PrimaryKeyRelatedField(
         source='surgery', queryset=Surgery.objects.filter(deleted_at__isnull=True),
         required=False, allow_null=True, write_only=True,
@@ -48,7 +54,17 @@ class CashEntryInputSerializer(serializers.ModelSerializer):
         surgery = attrs.get('surgery', getattr(self.instance, 'surgery', None))
         if patient is not None and surgery is not None:
             raise serializers.ValidationError('Provide either patient_id or surgery_id, not both.')
+        lens_order = attrs.get('lens_order', getattr(self.instance, 'lens_order_id', None))
+        if lens_order is not None and (patient is not None or surgery is not None):
+            raise serializers.ValidationError('Provide only one of patient_id, surgery_id or lens_order_id.')
         return attrs
+
+    def validate_lens_order_payment(self, validated_data):
+        lens_order = validated_data.get('lens_order')
+        if lens_order is not None and not LensOrder.objects.select_for_update().filter(
+            pk=lens_order.pk, deleted_at__isnull=True,
+        ).exists():
+            raise serializers.ValidationError({'lens_order_id': 'Pedido no encontrado.'})
 
     def validate_surgery_payment(self, validated_data, instance=None):
         surgery = validated_data.get('surgery', getattr(instance, 'surgery', None))
@@ -68,6 +84,7 @@ class CashEntryInputSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         self.validate_surgery_payment(validated_data)
+        self.validate_lens_order_payment(validated_data)
         return super().create(validated_data)
 
     @transaction.atomic
@@ -76,6 +93,7 @@ class CashEntryInputSerializer(serializers.ModelSerializer):
         self.instance = instance
         self.validate(validated_data)
         self.validate_surgery_payment(validated_data, instance)
+        self.validate_lens_order_payment(validated_data)
         return super().update(instance, validated_data)
 
     def to_representation(self, instance):
@@ -91,6 +109,7 @@ class CashQuerySerializer(serializers.Serializer):
     invoice_status = serializers.ChoiceField(choices=InvoiceStatusChoices.choices, required=False)
     patient_id = serializers.UUIDField(required=False)
     surgery_id = serializers.UUIDField(required=False)
+    lens_order_id = serializers.UUIDField(required=False)
 
     def validate(self, attrs):
         if 'date' in attrs and ('date_from' in attrs or 'date_to' in attrs):

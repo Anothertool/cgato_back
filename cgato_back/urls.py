@@ -19,12 +19,14 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from cash.views import CashEntryViewSet, CashSummaryViewSet
+from orders.views import LensOrderViewSet
 from patients.views import PatientViewSet
 from surgeries.views import SurgeryViewSet
 
 router = DefaultRouter()
 router.register('patients', PatientViewSet, basename='patient')
 router.register('surgeries', SurgeryViewSet, basename='surgery')
+router.register('orders', LensOrderViewSet, basename='lens-order')
 router.register('cash/entries', CashEntryViewSet, basename='cash-entry')
 router.register('cash/summary', CashSummaryViewSet, basename='cash-summary')
 
