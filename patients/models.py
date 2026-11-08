@@ -3,6 +3,7 @@ import uuid
 from django.db import models
 
 from .choices import PatientSourceChoices
+from .names import normalize_patient_name
 
 
 class Patient(models.Model):
@@ -19,6 +20,13 @@ class Patient(models.Model):
         ordering = ['first_name', 'last_name', 'id']
 
     def save(self, *args, **kwargs):
+        name_fields = ('first_name', 'last_name')
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            update_fields = kwargs['update_fields'] = frozenset(update_fields)
+        for field in name_fields:
+            if field in self.__dict__ and (update_fields is None or field in update_fields):
+                setattr(self, field, normalize_patient_name(getattr(self, field)))
         self.clinical_reference = (self.clinical_reference or '').strip() or None
         super().save(*args, **kwargs)
 

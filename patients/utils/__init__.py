@@ -41,8 +41,8 @@ from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.datetime import from_excel
 
-from .choices import PatientSourceChoices
-from .models import Patient
+from ..choices import PatientSourceChoices
+from ..models import Patient
 
 
 DEFAULT_PATH = Path(settings.BASE_DIR) / 'patients' / 'dataset' / '2026.xlsx'

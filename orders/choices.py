@@ -13,6 +13,17 @@ class LaboratoryChoices(models.TextChoices):
     MARKENOVI = 'MARKENOVI', 'MARKENOVI'
 
 
+class LensTypeChoices(models.TextChoices):
+    ORTHO_K = 'ortho_k', 'Orto-K'
+    RGP = 'rgp', 'RPG'
+    SOFT = 'soft', 'Blanda'
+
+
+class FormatChoices(models.TextChoices):
+    BLISTER = 'blister', 'Blíster'
+    BOX = 'box', 'Caja'
+
+
 class StatusChoices(models.TextChoices):
     PENDING = 'pending', 'Pendiente'
     ORDERED = 'ordered', 'Pedida'
