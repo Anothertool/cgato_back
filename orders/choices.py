@@ -11,12 +11,16 @@ class LaboratoryChoices(models.TextChoices):
     TIEDRA = 'TIEDRA', 'TIEDRA'
     MENICOM = 'MENICOM', 'MENICOM'
     MARKENOVI = 'MARKENOVI', 'MARKENOVI'
+    JOHNSON_JOHNSON = 'JOHNSON_JOHNSON', 'Johnson & Johnson'
+    BVI = 'BVI', 'BVI'
+    HOYA = 'HOYA', 'HOYA'
 
 
 class LensTypeChoices(models.TextChoices):
     ORTHO_K = 'ortho_k', 'Orto-K'
     RGP = 'rgp', 'RPG'
     SOFT = 'soft', 'Blanda'
+    LIO = 'lio', 'LIO'
 
 
 class FormatChoices(models.TextChoices):

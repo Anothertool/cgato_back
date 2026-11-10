@@ -14,6 +14,9 @@ class LensOrder(models.Model):
     patient = models.ForeignKey(
         'patients.Patient', on_delete=models.PROTECT, related_name='lens_orders',
     )
+    surgery = models.ForeignKey(
+        'surgeries.Surgery', on_delete=models.SET_NULL, null=True, blank=True, related_name='lens_orders',
+    )
     eye = models.CharField(max_length=5, choices=EyeChoices.choices, blank=True)
     laboratory = models.CharField(max_length=150, choices=LaboratoryChoices.choices, blank=True)
     lens_type = models.CharField(max_length=150, choices=LensTypeChoices.choices, blank=True)
